@@ -25,3 +25,13 @@ Usage:
 
 4. Proceed to connect to the server as you normally would. Note that there may be a small delay between events on proxied and direct-connected clients.
 
+To change the view displayed, search the code for "showInstead" and set it to one of these values:
+* Forward - 0x00
+* Port - 0x01
+* Starboard - 0x02
+* Aft - 0x03
+* Tactical - 0x04
+* LRS - 0x05
+* Status - 0x06
+
+Note: Actual view will not change until manually triggered - at that point the proxied client will switch to the view specified in the code.
