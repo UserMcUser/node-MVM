@@ -16,6 +16,7 @@ MVM takes up to three arguments:
                                    
 
 Usage:
+
 1. Run 'npm install' to install.
  
 2. Run "node mvm" with arguments or just "mvm" with arguments if installed Globally.
@@ -23,6 +24,4 @@ Usage:
 3. Launch Artemis on the computer where you want your new Mainscreen view to show. Make sure the networkPort value in this client's Artemis.ini file matches the "listen" port as specified on the command-line.
 
 4. Proceed to connect to the server as you normally would. Note that there may be a small delay between events on proxied and direct-connected clients.
-
-
 
