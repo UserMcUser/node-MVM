@@ -3,13 +3,16 @@ Mainscreen View Manager - Control which view appears on your Artemis Spaceship B
 
 Majority of the code lifted from "tcpslow" by llambda - https://github.com/llambda/tcpslow
 
-v.01 - First working build
+v1.0 - First Public Build
 
 MVM takes up to three arguments:
 * -l/--listen [port] Specifies the port MVM should use to accept Artemis client connections.
                    This should match the "networkPort" setting in Artemis.ini.
 
 * -f/--forward [port] Specifies the port MVM should use to connect to the real Artemis server.
+
+* -v/--view [0-6] Specifiy which view should be displayed. 0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,
+                  5=Long Range Sensors, and 6=Ship Status'
 
 * -h/--host [hostname or IP address] (Optional) The hostname or IP address of the real Artemis server.
                                    If not specified, this defaults to 'localhost'.
