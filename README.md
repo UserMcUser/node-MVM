@@ -5,7 +5,7 @@ Majority of the code lifted from "tcpslow" by llambda - https://github.com/llamb
 
 v1.0 - First Public Build
 
-MVM takes up to three arguments:
+MVM takes these arguments:
 * -l/--listen [port] Specifies the port MVM should use to accept Artemis client connections.
                    This should match the "networkPort" setting in Artemis.ini.
 
@@ -26,15 +26,6 @@ Usage:
 
 3. Launch Artemis on the computer where you want your new Mainscreen view to show. Make sure the networkPort value in this client's Artemis.ini file matches the "listen" port as specified on the command-line.
 
-4. Proceed to connect to the server as you normally would. Note that there may be a small delay between events on proxied and direct-connected clients.
+4. Proceed to connect to the server as you normally would; be sure and use the proxy server's IP if you are running it on another machine. Note that there may be a small delay between events on proxied and direct-connected clients.
 
-To change the view displayed, search the code for "showInstead" and set it to one of these values:
-* Forward - 0x00
-* Port - 0x01
-* Starboard - 0x02
-* Aft - 0x03
-* Tactical - 0x04
-* LRS - 0x05
-* Status - 0x06
-
-Note: Actual view will not change until manually triggered - at that point the proxied client will switch to the view specified in the code.
+Note: Actual view may not change until manually triggered - at that point the proxied client will switch to the view specified in the code.
