@@ -167,7 +167,7 @@ var bit = 0;
   for (i=0;i<28;i++){ //Only need to look until we get to the item we want.
       if (i === 19 && bitMapped[i] === 1) {
         var strLen = (buffer.readUInt32LE(runTot)*2);
-        var str = buffer.toString('utf16le', runTot + 4, runTot + strLen + 2);
+        //var str = buffer.toString('utf16le', runTot + 4, runTot + strLen + 2);
         console.log('str: ', str);
         fieldBytes[i] = strLen + 4;
       };
