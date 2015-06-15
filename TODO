@@ -1,0 +1,8 @@
+TO DO, in no particular order:
+
+*Add Perspective (1st/3rd) Option
+*Test for functionality with Multi-Bridge.
+*Add dynamic changing
+**By Rule (eg: Screen X is 90/180/270° of actual mainscreen)
+**By Time (eg: rotate LRS/Tactical/whatever every x seconds)
+**By keyboard command - From proxy window, maybe from in game??
