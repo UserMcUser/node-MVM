@@ -1,5 +1,9 @@
 //Based almost entirely on "tcpslow" by llambda - https://github.com/llambda/tcpslow
 //I just removed the "slow" parts and shoe-horned my code into the loop.
+//
+//Version History
+// v1.0 - First public release
+// v1.1 - Added perspective option, changed "-h" for host to "-s" for server to avoid collision wiht "-h" for help.
 
 'use strict';
 
@@ -11,16 +15,20 @@ var packagejson = require('./package.json');
 
 var MainPlayerPacket = new Buffer(5);
 MainPlayerPacket.writeUIntBE(0xf93d808001,0,5);
+var PerspectivePacket = new Buffer(5);
+PerspectivePacket.writeUIntBE(0xfec854f712,0,5);
 
 var temp = Buffer(0);
 var showInstead = 0;
+var perspectiveInstead = -1;
 
 program
 .version(packagejson.version)
 .option('-l, --listen [port]', 'TCP port to listen on', parseInt)
-.option('-f, --forward [port]', 'TCP port to forward to (normally 2010)', parseInt)
-.option('-v, --view [0-6]', 'What should the mainscreen show?\n                       0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,\n                       5=Long Range Sensors, and 6=Ship Status')
-.option('-h, --host [hostname]', 'IP or Hostname of the real Artemis Server.\n                       Defaults to \'localhost\' if unspecified.')
+.option('-f, --forward [port]', 'TCP port to forward to (Optional, default is 2010)', parseInt)
+.option('-v, --view [0-6]', 'What should the mainscreen show?\n                         0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,\n                         5=Long Range Sensors, and 6=Ship Status')
+.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd person.\n                         NOTE: Must manually toggle perspective to force\n                         initial change. (Optional)')
+.option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                         (Optional, default is \'localhost\')')
 .parse(process.argv);
 
 if (!program.listen) {
@@ -29,8 +37,7 @@ if (!program.listen) {
 }
 
 if (!program.forward) {
-  console.error('Please specify forwarding port (usually 2010)');
-  program.help();
+  program.forward = 2010;
 }
 
 if (!program.view) {
@@ -41,11 +48,11 @@ if (!program.view) {
 function createConnection() {
   var conn;
 
-  if (program.host || program.forward) {
+  if (program.server || program.forward) {
     conn = {};
     conn.port = program.forward;
-    if (program.host) {
-      conn.host = program.host;
+    if (program.server) {
+      conn.host = program.server;
     } else {
       conn.host = 'localhost';
     }
@@ -79,11 +86,20 @@ var server = net.createServer(function(listen) {
       if (bufferIndex){
         //console.log('bitmap: ', data.slice(29,34));
         //console.log('Buffer Index: ', bufferIndex);
-        console.log('Server Says the mainScreen is: ', getPrettyName(data.readUInt8(bufferIndex)));
+        console.log('Server Says the mainScreen view is: ', getPrettyView(data.readUInt8(bufferIndex)));
         data.writeUInt8(showInstead, bufferIndex);
-        console.log('But we are sending: ', getPrettyName(data.readUInt8(bufferIndex)));
-      };
-    };
+        console.log('But we are sending: ', getPrettyView(data.readUInt8(bufferIndex)));
+      };//End If bufferIndex
+    }; //End if MainPlayerPacket
+
+    //console.log(temp);
+
+    if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
+        console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(28),1));
+        data.writeUInt8(perspectiveInstead, 28);
+        //console.log('Contents of Buffer: ', data);
+        console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(28),1));
+    }; //End if PerspectivePacket
 
     if (program.packet) console.log(chalk.red(data))
       setTimeout(function() {
@@ -132,13 +148,22 @@ var server = net.createServer(function(listen) {
 });
 
 server.listen(program.listen ? program.listen : program.listenuds, function() {
-  console.log('Mainscreen View Manager version' + packagejson.version);
+  console.log('Mainscreen View Manager v' + packagejson.version);
+
   if (program.listen) {
     console.log('Listening on port ' + program.listen);
-  }
-  console.log('Relaying to ' + (program.host ? program.host + ' ' : '') + 'port ' + program.forward);
+  };
+
+  console.log('Relaying to ' + (program.server ? program.server + ' ' : '') + 'port ' + program.forward);
+
   showInstead = program.view;
-  console.log('View will be set to: ', getPrettyName(showInstead));
+  console.log('View will be set to: ', getPrettyView(showInstead));
+
+  if (program.perspective) {
+    perspectiveInstead = getPerspective(program.perspective);
+    console.log('Perspective will be set to: ', getPrettyPerspective(program.perspective,0));
+  };
+
   console.log('Use Control+C to quit.');
   });
 
@@ -178,7 +203,7 @@ var bit = 0;
   return runTot;
 }; //End Function
 
-function getPrettyName(theView) {
+function getPrettyView(theView) {
   if (theView == 0) return 'Fore';
   if (theView == 1) return 'Port';
   if (theView == 2) return 'Starboard';
@@ -188,3 +213,16 @@ function getPrettyName(theView) {
   if (theView == 6) return 'Status';
   return 'Out of Bounds';
 }; //End Function
+
+function getPerspective(thePerspective) {
+  if (thePerspective == 1) return 0;
+  if (thePerspective == 3) return 1;
+}; //End getPerspective
+
+function getPrettyPerspective(thePerspective, altMode) {
+  if (thePerspective == 0) return '1st Person';
+  if (altMode && thePerspective == 1) return '3rd person';
+  if (thePerspective == 1) return '1st person';
+  if (thePerspective == 3) return '3rd person';
+  return 'Out of Bounds';
+}//End getPrettyPerspective
