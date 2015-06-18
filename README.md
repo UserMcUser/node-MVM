@@ -8,19 +8,19 @@ v1.0 - First Public Build
 v1.1.0 - Added Perspective option.
 
 MVM takes these arguments:
-* -l/--listen [port] Specifies the port MVM should use to accept Artemis client connections.
+* -l/--listen \[port\] Specifies the port MVM should use to accept Artemis client connections.
                    This should match the "networkPort" setting in Artemis.ini.
 
-* -f/--forward [port] (Optional) Specifies the port MVM should use to connect to the real Artemis server.
-                      If not specified, defaults to 2010 (Artemis' default)
+* -f/--forward \[port\] \(Optional\) Specifies the port MVM should use to connect to the real Artemis server.
+                      If not specified, defaults to 2010 \(Artemis' default\)
 
-* -v/--view [0-6] Specifiy which view should be displayed. 0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,
+* -v/--view \[0-6\] Specifiy which view should be displayed. 0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,
                   5=Long Range Sensors, and 6=Ship Status'
 
-* -p/--perspective [1,3] (Optional) Specifiy which perspective should be displayed. 1 = First person, 3 = Third person.
+* -p/--perspective \[1,3\] \(Optional\) Specifiy which perspective should be displayed. 1 = First person, 3 = Third person.
                          Note: Will almost certainly need to manually toggle perspective before it will lock.
 
-* -s/--server [hostname or IP address] (Optional) The hostname or IP address of the real Artemis server.
+* -s/--server \[hostname or IP address\] \(Optional\) The hostname or IP address of the real Artemis server.
                                        If not specified, this defaults to 'localhost'.
                                    
 
