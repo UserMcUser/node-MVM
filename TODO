@@ -1,6 +1,6 @@
 TO DO, in no particular order:
 
-*Add Perspective (1st/3rd) Option
+*Add Perspective (1st/3rd) Option (DONE - v1.1.0)
 *Test for functionality with Multi-Bridge.
 *Add dynamic changing
 **By Rule (eg: Screen X is 90/180/270° of actual mainscreen)
