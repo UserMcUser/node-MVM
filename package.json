@@ -1,6 +1,6 @@
 {
   "name": "node-mvm",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Mainscreen View Manager - Mod for Artemis Space Ship Bridge Simulator - Control what is shown on your Main Screen clients! Uses a TCP proxy that injects changes into Artemis packets.",
   "main": "mvm.js",
   "repository": {
