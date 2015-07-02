@@ -7,6 +7,8 @@ v1.0 - First Public Build
 
 v1.1.0 - Added Perspective option.
 
+v1.2.0 - Added Rotation Option
+
 MVM takes these arguments:
 * -l/--listen \[port\] Specifies the port MVM should use to accept Artemis client connections.
                    This should match the "networkPort" setting in Artemis.ini.
