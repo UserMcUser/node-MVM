@@ -28,7 +28,7 @@ var viewArrayPort = [1,0,2,3];
 var viewArrayStar = [2,3,1,0];
 var viewArrayAft = [3,1,0,2];
 var showInstead = 0;
-var perspectiveInstead = -1;
+var perspectiveInstead = -1; 
 
 
 program
