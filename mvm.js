@@ -4,6 +4,7 @@
 //Version History
 // v1.0 - First public release
 // v1.1 - Added perspective option, changed "-h" for host to "-s" for server to avoid collision wiht "-h" for help.
+// v1.2 - Added "Dynamic" switching in 90º increments.
 
 'use strict';
 
@@ -19,16 +20,24 @@ var PerspectivePacket = new Buffer(5);
 PerspectivePacket.writeUIntBE(0xfec854f712,0,5);
 
 var temp = Buffer(0);
+var realMainScreenView = 0;
+var viewTemp = 0;
+var screenRotation = 0;
+var viewArrayFore = [0,2,3,1]; //Because the order of the screens isn't layed out spatially we can't use simple math to determine the rotation. So rather than fuck around with lots of logic, I just pre-built these arrays.
+var viewArrayPort = [1,0,2,3];
+var viewArrayStar = [2,3,1,0];
+var viewArrayAft = [3,1,0,2];
 var showInstead = 0;
 var perspectiveInstead = -1;
+
 
 program
 .version(packagejson.version)
 .option('-l, --listen [port]', 'TCP port to listen on', parseInt)
-.option('-f, --forward [port]', 'TCP port to forward to (Optional, default is 2010)', parseInt)
-.option('-v, --view [0-6]', 'What should the mainscreen show?\n                         0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical,\n                         5=Long Range Sensors, and 6=Ship Status')
-.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd person.\n                         NOTE: Must manually toggle perspective to force\n                         initial change. (Optional)')
-.option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                         (Optional, default is \'localhost\')')
+.option('-f, --forward [port]', 'TCP port to forward to (Optional, default is\n                             2010)', parseInt)
+.option('-v, --view [0-6,90,180,270]', 'What should the mainscreen show?\n                             0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical\n                             5=Long Range Sensors, and 6=Ship Status\n                             90,180,270=Rotate by x Degrees from actual\n                             mainscreen view in 90º increments.')
+.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. NOTE: Must manually toggle perspective\n                             to force initial change. (Optional)')
+.option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                             (Optional, default is \'localhost\')')
 .parse(process.argv);
 
 if (!program.listen) {
@@ -43,7 +52,14 @@ if (!program.forward) {
 if (!program.view) {
   console.error('Please specify the desired view.');
   program.help();
-}
+} else {
+  if (program.view > 6) {
+    if (program.view % 90 !== 0) {
+      console.error('Please specify the view using 0-6 or a degree of rotation in increments of 90º.');
+      program.help();
+    }; //End If
+  }; //End If
+} //End If
 
 function createConnection() {
   var conn;
@@ -86,9 +102,18 @@ var server = net.createServer(function(listen) {
       if (bufferIndex){
         //console.log('bitmap: ', data.slice(29,34));
         //console.log('Buffer Index: ', bufferIndex);
-        console.log('Server Says the mainScreen view is: ', getPrettyView(data.readUInt8(bufferIndex)));
-        data.writeUInt8(showInstead, bufferIndex);
-        console.log('But we are sending: ', getPrettyView(data.readUInt8(bufferIndex)));
+        realMainScreenView = data.readUInt8(bufferIndex);
+        if (!screenRotation) {
+          console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));
+          data.writeUInt8(showInstead, bufferIndex);
+          console.log('But we are sending: ', getPrettyView(data.readUInt8(bufferIndex)));
+        } else {
+          console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));
+          viewTemp = getViewByDegrees(realMainScreenView, screenRotation);
+          if (viewTemp !== -1) showInstead = viewTemp;
+          data.writeUInt8(showInstead, bufferIndex);
+          console.log('But we are dynamically rotating by', screenRotation, ' degrees and sending: ', getPrettyView(data.readUInt8(bufferIndex)));
+        };
       };//End If bufferIndex
     }; //End if MainPlayerPacket
 
@@ -156,8 +181,14 @@ server.listen(program.listen ? program.listen : program.listenuds, function() {
 
   console.log('Relaying to ' + (program.server ? program.server + ' ' : '') + 'port ' + program.forward);
 
-  showInstead = program.view;
-  console.log('View will be set to: ', getPrettyView(showInstead));
+  if (program.view < 7) {
+    showInstead = program.view;
+    console.log('View will be set to: ', getPrettyView(showInstead));
+  } else {
+    screenRotation = program.view;
+    showInstead = getViewByDegrees(0,screenRotation);//Default
+    console.log('View will dynamically change to be', screenRotation, 'degrees clockwise from actual Mainscreen.');
+  }
 
   if (program.perspective) {
     perspectiveInstead = getPerspective(program.perspective);
@@ -226,3 +257,33 @@ function getPrettyPerspective(thePerspective, altMode) {
   if (thePerspective == 3) return '3rd person';
   return 'Out of Bounds';
 }//End getPrettyPerspective
+
+function getViewByDegrees(theRealView, theDegrees) {
+  if (theRealView < 4) {
+    switch(theRealView) {
+
+      case 0: //Fore
+        return viewArrayFore[theDegrees / 90];
+        break;
+
+      case 1: //Port
+        return viewArrayPort[theDegrees / 90];
+        break;
+
+      case 2: //Starboard
+        return viewArrayStar[theDegrees / 90];
+        break;
+
+      case 3: //Aft
+        return viewArrayAft[theDegrees / 90];
+        break;
+
+      default:
+        console.error('Somehow we didn\'t switch right in getViewByDegrees.');
+        return -1;
+        break;
+    }//End Switch
+  } else {
+    return -1; //
+  };
+}//End getViewByDegrees
