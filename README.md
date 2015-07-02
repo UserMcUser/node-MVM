@@ -18,7 +18,7 @@ MVM takes these arguments:
 
 * -v/--view \[0-6,90,180,270\] Specifiy which view should be displayed. 0=Fore, 1=Port, 2=Starboard,
                   3=Aft, 4=Tactical, 5=Long Range Sensors, and 6=Ship Status 90,180,270=Rotate by
-                  x Degrees from actual mainscreen view in 90º increments.'
+                  x Degrees from actual mainscreen view in 90º increments.
 
 * -p/--perspective \[1,3\] \(Optional\) Specifiy which perspective should be displayed. 1 = First person, 3 = Third person.
                          Note: Will almost certainly need to manually toggle perspective before it will lock.
