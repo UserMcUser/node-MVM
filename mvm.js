@@ -204,7 +204,8 @@ function unpackBitmap(bufferSlice, buffer) { //Returns the number of bytes to sk
 var fieldBytes = [4,4,4,4,4,1,1,4,2,4,4,4,4,4,4,4,4,4,2,0,4,4,4,4,4,1,4,0,0,0,0,0]; //As of Artemis 2.1.5
 var bitMapped = Array(40);
 var bitmap = Array(5);
-var runTot = 34; //Running Total of bytes we can skip.
+//var runTot = 34; //Running Total of bytes we can skip.
+  var runTot = 35; //Test fix for Artemis v2.3.0 and later
 var i = 0;
 var byte = 0;
 var bit = 0;
