@@ -5,6 +5,7 @@
 // v1.0 - First public release
 // v1.1 - Added perspective option, changed "-h" for host to "-s" for server to avoid collision wiht "-h" for help.
 // v1.2 - Added "Dynamic" switching in 90º increments.
+// v1.3 - Updated for Artemis 2.5.1; added option to still support old client versions.
 
 'use strict';
 
@@ -29,15 +30,17 @@ var viewArrayStar = [2,3,1,0];
 var viewArrayAft = [3,1,0,2];
 var showInstead = 0;
 var perspectiveInstead = -1; 
-
+var oldVersion = 0;
+var perspectiveOffset = 25;
 
 program
 .version(packagejson.version)
 .option('-l, --listen [port]', 'TCP port to listen on', parseInt)
 .option('-f, --forward [port]', 'TCP port to forward to (Optional, default is\n                             2010)', parseInt)
 .option('-v, --view [0-6,90,180,270]', 'What should the mainscreen show?\n                             0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical\n                             5=Long Range Sensors, and 6=Ship Status\n                             90,180,270=Rotate by x Degrees from actual\n                             mainscreen view in 90º increments.')
-.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. NOTE: Must manually toggle perspective\n                             to force initial change. (Optional)')
+.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. NOTE: Depreciated setting - may\n                             not function in Artemis 2.3.0 and up.\n                             Must manually toggle perspective\n                             to force initial change. (Optional, requires -o)')
 .option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                             (Optional, default is \'localhost\')')
+.option('-o, --oldVersion', 'Setting this option will allow MVM to work\n                             with Artemis clients <=2.1.5')
 .parse(process.argv);
 
 if (!program.listen) {
@@ -60,6 +63,14 @@ if (!program.view) {
     }; //End If
   }; //End If
 } //End If
+
+if (program.oldVersion) {
+  oldVersion = 1;
+  perspectiveOffset = 28; // Artemis <=2.1.5
+} else {
+  oldVersion = 0;
+  var perspectiveOffset = 25; // Artemis >=2.3.0+
+}
 
 function createConnection() {
   var conn;
@@ -120,10 +131,11 @@ var server = net.createServer(function(listen) {
     //console.log(temp);
 
     if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
-        console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(28),1));
-        data.writeUInt8(perspectiveInstead, 28);
-        //console.log('Contents of Buffer: ', data);
-        console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(28),1));
+
+        //console.log('Contents of Perspective Buffer: ', data);
+        console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));
+        data.writeUInt8(perspectiveInstead, perspectiveOffset);
+        console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));
     }; //End if PerspectivePacket
 
     if (program.packet) console.log(chalk.red(data))
@@ -191,8 +203,12 @@ server.listen(program.listen ? program.listen : program.listenuds, function() {
   }
 
   if (program.perspective) {
-    perspectiveInstead = getPerspective(program.perspective);
+    if (!oldVersion) {
+      console.error('**Perspective option depreciated in latest Artemis.**\n**Perspective setting will be ignored.**')
+    } else {
+          perspectiveInstead = getPerspective(program.perspective);
     console.log('Perspective will be set to: ', getPrettyPerspective(program.perspective,0));
+    }
   };
 
   console.log('Use Control+C to quit.');
@@ -204,8 +220,7 @@ function unpackBitmap(bufferSlice, buffer) { //Returns the number of bytes to sk
 var fieldBytes = [4,4,4,4,4,1,1,4,2,4,4,4,4,4,4,4,4,4,2,0,4,4,4,4,4,1,4,0,0,0,0,0]; //As of Artemis 2.1.5
 var bitMapped = Array(40);
 var bitmap = Array(5);
-//var runTot = 34; //Running Total of bytes we can skip.
-  var runTot = 35; //Test fix for Artemis v2.3.0 and later
+if (oldVersion) {var runTot = 34;} else {var runTot = 35;} //Running Total of bytes we can skip. 35 for 2.3.0+, 34 for <2.3.0
 var i = 0;
 var byte = 0;
 var bit = 0;
