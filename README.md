@@ -9,6 +9,8 @@ v1.1.0 - Added Perspective option.
 
 v1.2.0 - Added Rotation Option
 
+v1.3.0 - Fixed compatibility with Artemis v2.3.0+; Added flag to support Artemis <=2.1.5. Perspective option no longer works with Artemis >=2.3.0 but is retained for use with older clients.
+
 MVM takes these arguments:
 * -l/--listen \[port\] Specifies the port MVM should use to accept Artemis client connections.
                    This should match the "networkPort" setting in Artemis.ini.
@@ -20,12 +22,16 @@ MVM takes these arguments:
                   3=Aft, 4=Tactical, 5=Long Range Sensors, and 6=Ship Status 90,180,270=Rotate by
                   x Degrees from actual mainscreen view in 90º increments.
 
-* -p/--perspective \[1,3\] \(Optional\) Specifiy which perspective should be displayed. 1 = First person, 3 = Third person.
-                         Note: Will almost certainly need to manually toggle perspective before it will lock.
 
 * -s/--server \[hostname or IP address\] \(Optional\) The hostname or IP address of the real Artemis server.
                                        If not specified, this defaults to 'localhost'.
-                                   
+* -o/--oldVersion \(Optional\) Enables compatibility with Artemis clients <= 2.1.5
+                  Note: MVM will either crash or produce inconsistent behavior in your client if this flag is incorrectly assigned due to changes in the protocol.
+
+* -p/--perspective \[1,3\] \(Optional, Requires -o flag\) Specifiy which perspective should be displayed. 1 = First person, 3 = Third person.
+                         Note: Will almost certainly need to manually toggle perspective before it will lock.
+                         This option is no longer supported for Artemis clients >=2.3.0.
+                        
 
 Usage:
 
