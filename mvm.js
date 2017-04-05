@@ -60,6 +60,11 @@ if (!program.view) {
     if (program.view % 90 !== 0) {
       console.error('Please specify the view using 0-6 or a degree of rotation in increments of 90º.');
       program.help();
+    } else {
+      if (program.view > 270) {
+        console.error('A rotation value greater than 270º is pointless and not allowed.');
+        program.help();
+      }; //End If
     }; //End If
   }; //End If
 } //End If
@@ -69,7 +74,7 @@ if (program.oldVersion) {
   perspectiveOffset = 28; // Artemis <=2.1.5
 } else {
   oldVersion = 0;
-  var perspectiveOffset = 25; // Artemis >=2.3.0+
+  perspectiveOffset = 25; // Artemis >=2.3.0+ Not that this value is *used* mind you...
 }
 
 function createConnection() {
@@ -206,8 +211,8 @@ server.listen(program.listen ? program.listen : program.listenuds, function() {
     if (!oldVersion) {
       console.error('**Perspective option depreciated in latest Artemis.**\n**Perspective setting will be ignored.**')
     } else {
-          perspectiveInstead = getPerspective(program.perspective);
-    console.log('Perspective will be set to: ', getPrettyPerspective(program.perspective,0));
+      perspectiveInstead = getPerspective(program.perspective);
+      console.log('Perspective will be set to: ', getPrettyPerspective(program.perspective,0));
     }
   };
 
