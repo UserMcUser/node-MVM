@@ -9,7 +9,8 @@ v1.1.0 - Added Perspective option.
 
 v1.2.0 - Added Rotation Option
 
-v1.3.0 - Fixed compatibility with Artemis v2.3.0+; Added flag to support Artemis <=2.2.0. Perspective option is only available for use with older clients.
+v1.3.0 - Fixed compatibility with Artemis v2.3.0+; Added flag to support Artemis <=2.2.0.
+         Perspective option is now only available for use with older clients.
 
 MVM takes these arguments:
 * -l/--listen \[port\] Specifies the port MVM should use to accept Artemis client connections.
