@@ -5,7 +5,8 @@
 // v1.0 - First public release
 // v1.1 - Added perspective option, changed "-h" for host to "-s" for server to avoid collision wiht "-h" for help.
 // v1.2 - Added "Dynamic" switching in 90º increments.
-// v1.3 - Updated for Artemis 2.5.1; added option to still support old client versions.
+// v1.3 - Updated for Artemis 2.5.1; added option to support old client versions.
+//        Removed a bunch of unused code from tcpslow. Removed perspective option, except for compatibility mode.
 
 'use strict';
 
@@ -29,22 +30,24 @@ var viewArrayPort = [1,0,2,3];
 var viewArrayStar = [2,3,1,0];
 var viewArrayAft = [3,1,0,2];
 var showInstead = 0;
-var perspectiveInstead = -1; 
+var perspectiveInstead = -1;
 var oldVersion = 0;
 var perspectiveOffset = 25;
+var verbose = 1;
 
 program
 .version(packagejson.version)
-.option('-l, --listen [port]', 'TCP port to listen on', parseInt)
-.option('-f, --forward [port]', 'TCP port to forward to (Optional, default is\n                             2010)', parseInt)
-.option('-v, --view [0-6,90,180,270]', 'What should the mainscreen show?\n                             0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical\n                             5=Long Range Sensors, and 6=Ship Status\n                             90,180,270=Rotate by x Degrees from actual\n                             mainscreen view in 90º increments.')
-.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. NOTE: Depreciated setting - may\n                             not function in Artemis 2.3.0 and up.\n                             Must manually toggle perspective\n                             to force initial change. (Optional, requires -o)')
-.option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                             (Optional, default is \'localhost\')')
-.option('-o, --oldVersion', 'Setting this option will allow MVM to work\n                             with Artemis clients <=2.1.5')
+.option('-l, --listen [port]', 'TCP port to listen on\n', parseInt)
+.option('-f, --forward [port]', 'TCP port to forward to (Optional, default is\n                             2010)\n', parseInt)
+.option('-v, --view [0-6,90,180,270]', 'What should the mainscreen show?\n                             0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical\n                             5=Long Range Sensors, and 6=Ship Status\n                             90,180,270=Rotate by x Degrees from actual\n                             mainscreen view in 90º increments.\n')
+.option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                             (Optional, default is \'localhost\')\n')
+.option('-o, --oldVersion', 'Setting this option will allow MVM to work\n                             with Artemis v2.1.1 thru 2.2.0\n')
+.option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. (Optional, requires -o)\n                             Toggle perspective once to initialize.\n                             Note: Not compatible with Artemis >=2.3.0\n', parseInt)
+.option('-q, --quiet', 'Suppress console messages after initialization')
 .parse(process.argv);
 
 if (!program.listen) {
-  console.error('Please specify listening port.');
+  console.error('\nPlease specify listening port.');
   program.help();
 }
 
@@ -53,17 +56,17 @@ if (!program.forward) {
 }
 
 if (!program.view) {
-  console.error('Please specify the desired view.');
+  console.error('\nPlease specify the desired view.');
   program.help();
 } else {
   if (program.view > 6) {
     if (program.view % 90 !== 0) {
-      console.error('Please specify the view using 0-6 or a degree of rotation in increments of 90º.');
+      console.error('\nPlease specify the view using 0-6 or a degree of rotation in increments of 90º.');
       program.help();
     } else {
       if (program.view > 270) {
-        console.error('A rotation value greater than 270º is pointless and not allowed.');
-        program.help();
+        console.error('\nERROR: A rotation value greater than 270º is not allowed. Or useful.');
+        return 0; //
       }; //End If
     }; //End If
   }; //End If
@@ -76,6 +79,15 @@ if (program.oldVersion) {
   oldVersion = 0;
   perspectiveOffset = 25; // Artemis >=2.3.0+ Not that this value is *used* mind you...
 }
+
+if (program.perspective) {
+  if (!oldVersion) {
+    console.log('\nERROR: MVM can only provide perspective locking in Artemis v2.1.1 thru 2.2.0\nMust use \'-o/--oldVersion\' argument with \'-p/--perspective\'')
+    return 0;
+  }
+}
+
+if (program.quiet) {verbose = 0;}
 
 function createConnection() {
   var conn;
@@ -91,133 +103,6 @@ function createConnection() {
     return net.createConnection(conn);
   }
 }
-
-function logSocketStatus(status, socket) {
-  if (program.verbose) {
-    console.log(new Date () + ' local: ' + socket.localAddress + ':' + socket.localPort
-     + ' remote: ' + socket.remoteAddress + ':' + socket.remotePort + ' | ' + status);
-  }
-}
-
-var server = net.createServer(function(listen) {
-  logSocketStatus('(listening) client connected', listen);
-
-  listen.forward = createConnection();
-  listen.forward.on('connect', function() {
-
-    logSocketStatus('(forwarding) client connected.', listen.forward);
-  });
-  listen.forward.on('data', function(data) {
-    //MVM Lie Goes here.
-    temp = data.slice(20,25);
-    //console.log(temp);
-
-    if (temp.equals(MainPlayerPacket)){
-      var bufferIndex = unpackBitmap(data.slice(29,34), data);
-
-      if (bufferIndex){
-        //console.log('bitmap: ', data.slice(29,34));
-        //console.log('Buffer Index: ', bufferIndex);
-        realMainScreenView = data.readUInt8(bufferIndex);
-        if (!screenRotation) {
-          console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));
-          data.writeUInt8(showInstead, bufferIndex);
-          console.log('But we are sending: ', getPrettyView(data.readUInt8(bufferIndex)));
-        } else {
-          console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));
-          viewTemp = getViewByDegrees(realMainScreenView, screenRotation);
-          if (viewTemp !== -1) showInstead = viewTemp;
-          data.writeUInt8(showInstead, bufferIndex);
-          console.log('But we are dynamically rotating by', screenRotation, ' degrees and sending: ', getPrettyView(data.readUInt8(bufferIndex)));
-        };
-      };//End If bufferIndex
-    }; //End if MainPlayerPacket
-
-    //console.log(temp);
-
-    if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
-
-        //console.log('Contents of Perspective Buffer: ', data);
-        console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));
-        data.writeUInt8(perspectiveInstead, perspectiveOffset);
-        console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));
-    }; //End if PerspectivePacket
-
-    if (program.packet) console.log(chalk.red(data))
-      setTimeout(function() {
-        listen.write(data);
-      }, program.delay);
-  });
-  listen.forward.on('error', function(err) {
-    // if (program.verbose) console.log(new Date() + ' (forwarding) error ' + err);
-    logSocketStatus('(forwarding) error ' + err, listen.forward);
-    listen.destroy();
-  });
-  listen.forward.on('end', function() {
-    // if (program.verbose) console.log(new Date() + ' (forwarding) client end.');
-    logSocketStatus('(forwarding) end ' , listen.forward);
-    listen.end();
-  });
-  listen.forward.on('close', function(closed) {
-    // if (program.verbose) console.log(new Date() + ' (forwarding) client close.');
-    logSocketStatus('(forwarding) close ' , listen.forward);
-    listen.end();
-  })
-
-  listen.on('data', function(data) {
-    if (program.sending) {
-      setTimeout(function() {
-        listen.forward.write(data);
-      }, program.delay);
-    } else {
-      listen.forward.write(data);
-    }
-    if (program.packet) console.log(chalk.blue(data));
-  });
-  listen.on('end', function() {
-    logSocketStatus(' (listening) end ' , listen);
-    listen.forward.end();
-    listen.end();
-  });
-  listen.on('error', function(err) {
-    logSocketStatus(' (listening) error ' , listen);
-    listen.forward.destroy();
-  });
-  listen.on('close', function() {
-    logSocketStatus(' (listening) close ' , listen);
-    listen.forward.end();
-  });
-});
-
-server.listen(program.listen ? program.listen : program.listenuds, function() {
-  console.log('Mainscreen View Manager v' + packagejson.version);
-
-  if (program.listen) {
-    console.log('Listening on port ' + program.listen);
-  };
-
-  console.log('Relaying to ' + (program.server ? program.server + ' ' : '') + 'port ' + program.forward);
-
-  if (program.view < 7) {
-    showInstead = program.view;
-    console.log('View will be set to: ', getPrettyView(showInstead));
-  } else {
-    screenRotation = program.view;
-    showInstead = getViewByDegrees(0,screenRotation);//Default
-    console.log('View will dynamically change to be', screenRotation, 'degrees clockwise from actual Mainscreen.');
-  }
-
-  if (program.perspective) {
-    if (!oldVersion) {
-      console.error('**Perspective option depreciated in latest Artemis.**\n**Perspective setting will be ignored.**')
-    } else {
-      perspectiveInstead = getPerspective(program.perspective);
-      console.log('Perspective will be set to: ', getPrettyPerspective(program.perspective,0));
-    }
-  };
-
-  console.log('Use Control+C to quit.');
-  });
 
 function unpackBitmap(bufferSlice, buffer) { //Returns the number of bytes to skip.
 
@@ -277,7 +162,7 @@ function getPrettyPerspective(thePerspective, altMode) {
   if (thePerspective == 1) return '1st person';
   if (thePerspective == 3) return '3rd person';
   return 'Out of Bounds';
-}//End getPrettyPerspective
+};//End getPrettyPerspective
 
 function getViewByDegrees(theRealView, theDegrees) {
   if (theRealView < 4) {
@@ -308,3 +193,108 @@ function getViewByDegrees(theRealView, theDegrees) {
     return -1; //
   };
 }//End getViewByDegrees
+
+var server = net.createServer(function(listen) {
+  listen.forward = createConnection();
+
+  listen.forward.on('connect', function() {});
+
+  listen.forward.on('data', function(data) {
+
+    //MVM Lie Goes here.
+    temp = data.slice(20,25);
+    //console.log(temp);
+
+    if (temp.equals(MainPlayerPacket)){
+      var bufferIndex = unpackBitmap(data.slice(29,34), data);
+
+      if (bufferIndex){
+        //console.log('bitmap: ', data.slice(29,34));
+        //console.log('Buffer Index: ', bufferIndex);
+        realMainScreenView = data.readUInt8(bufferIndex);
+        if (!screenRotation) {
+          if(verbose){console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));}
+          data.writeUInt8(showInstead, bufferIndex);
+          if(verbose){console.log('But we are sending: ', getPrettyView(data.readUInt8(bufferIndex)));}
+        } else {
+          if(verbose){console.log('Server Says the mainScreen view is: ', getPrettyView(realMainScreenView));}
+          viewTemp = getViewByDegrees(realMainScreenView, screenRotation);
+          if (viewTemp !== -1) showInstead = viewTemp;
+          data.writeUInt8(showInstead, bufferIndex);
+          if(verbose){console.log('But we are dynamically rotating by', screenRotation, ' degrees and sending: ', getPrettyView(data.readUInt8(bufferIndex)));}
+        };
+      };//End If bufferIndex
+    }; //End if MainPlayerPacket
+
+    //console.log(temp);
+
+    if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
+
+        //console.log('Contents of Perspective Buffer: ', data);
+        if(verbose){console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));}
+        data.writeUInt8(perspectiveInstead, perspectiveOffset);
+        if(verbose){console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));}
+    }; //End if PerspectivePacket
+
+    listen.write(data);
+})
+
+  listen.forward.on('error', function(err) {
+    listen.destroy();
+  });
+  listen.forward.on('end', function() {
+    listen.end();
+  });
+  listen.forward.on('close', function(closed) {
+    listen.end();
+  });
+
+  listen.on('data', function(data) {
+    listen.forward.write(data);
+  });
+
+  listen.on('end', function() {
+    listen.forward.end();
+    listen.end();
+  });
+  listen.on('error', function(err) {
+    listen.forward.destroy();
+  });
+
+  listen.on('close', function() {
+    listen.forward.end();
+  });
+})
+
+
+server.listen(program.listen, function() {
+  console.log('Mainscreen View Manager v' + packagejson.version + '\n');
+
+  if (program.oldVersion) {
+    console.log('Compatability mode enabled.\n')
+  };
+
+  if (program.listen) {
+    console.log('Listening on port ' + program.listen);
+  };
+
+  console.log('Relaying to ' + (program.server ? program.server + ' ' : '') + 'port ' + program.forward + '\n');
+
+  if (program.view < 7) {
+    showInstead = program.view;
+    console.log('View will be set to: ' + getPrettyView(showInstead));
+  } else {
+    screenRotation = program.view;
+    showInstead = getViewByDegrees(0,screenRotation);//Default
+    console.log('View will dynamically change to be ' + screenRotation + 'º clockwise from actual Mainscreen.');
+  }
+
+  if (program.perspective) {
+    if (oldVersion) {
+      perspectiveInstead = getPerspective(program.perspective);
+      console.log('Perspective will be set to: ' + getPrettyPerspective(program.perspective,0));
+    }
+  };
+    console.log('\nUse Control+C to quit.');
+    if(!verbose){console.log('\nNo further console messages will be shown.')};
+});
