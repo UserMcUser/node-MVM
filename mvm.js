@@ -208,6 +208,8 @@ var server = net.createServer(function(listen) {
     if (temp.equals(MainPlayerPacket)){
       var bufferIndex = unpackBitmap(data.slice(29,34), data);
 
+      if (bufferIndex > 193) {bufferIndex = -1}
+      
       if (bufferIndex){
         //console.log('bitmap: ', data.slice(29,34));
         //console.log('Buffer Index: ', bufferIndex);
