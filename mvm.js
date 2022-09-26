@@ -11,8 +11,6 @@
 'use strict';
 
 var net = require('net');
-var chalk = require('chalk');
-var path = require('path');
 var program = require('commander');
 var packagejson = require('./package.json');
 
