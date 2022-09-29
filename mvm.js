@@ -1,5 +1,6 @@
 //Based almost entirely on "tcpslow" by llambda - https://github.com/llambda/tcpslow
-//I just removed the "slow" parts and shoe-horned my code into the loop.
+//UserMcUser just removed the "slow" parts and shoe-horned MVM code into the loop.
+//NoseyNick obsoleted --oldVersion by parsing server version, support Artemis 2.8.x
 //
 //Version History
 // v1.0 - First public release
@@ -7,32 +8,31 @@
 // v1.2 - Added "Dynamic" switching in 90º increments.
 // v1.3 - Updated for Artemis 2.5.1; added option to support old client versions.
 //        Removed a bunch of unused code from tcpslow. Removed perspective option, except for compatibility mode.
+// v1.4-NN - Does not use chalk or path. Fix Buffer() DeprecationWarning. Tidied.
+// v1.5-NN - Updated for Artemis 2.8.x. Tidied packet Parsing.
+//           Parse Version packets (obsolete --oldVersion).
 
 'use strict';
 
 var net = require('net');
-var chalk = require('chalk');
-var path = require('path');
 var program = require('commander');
 var packagejson = require('./package.json');
 
-var MainPlayerPacket = new Buffer(5);
-MainPlayerPacket.writeUIntBE(0xf93d808001,0,5);
-var PerspectivePacket = new Buffer(5);
-PerspectivePacket.writeUIntBE(0xfec854f712,0,5);
+var minor_ver = 8; // Artemis v2.X - assume Artemis 2.8 until we find otherwise
+var VersionPacket     = Buffer.from([0x4a, 0xe7, 0x48, 0xe5]);
+var MainPlayerPacket  = Buffer.from([0xf9, 0x3d, 0x80, 0x80, 0x01]);
+var PerspectivePacket = Buffer.from([0xfe, 0xc8, 0x54, 0xf7, 0x12]);
 
-var temp = Buffer(0);
+var temp;
 var realMainScreenView = 0;
 var viewTemp = 0;
 var screenRotation = 0;
 var viewArrayFore = [0,2,3,1]; //Because the order of the screens isn't layed out spatially we can't use simple math to determine the rotation. So rather than fuck around with lots of logic, I just pre-built these arrays.
 var viewArrayPort = [1,0,2,3];
 var viewArrayStar = [2,3,1,0];
-var viewArrayAft = [3,1,0,2];
+var viewArrayAft  = [3,1,0,2];
 var showInstead = 0;
 var perspectiveInstead = -1;
-var oldVersion = 0;
-var perspectiveOffset = 25;
 var verbose = 1;
 
 program
@@ -41,7 +41,6 @@ program
 .option('-f, --forward [port]', 'TCP port to forward to (Optional, default is\n                             2010)\n', parseInt)
 .option('-v, --view [0-6,90,180,270]', 'What should the mainscreen show?\n                             0=Fore, 1=Port, 2=Starboard, 3=Aft, 4=Tactical\n                             5=Long Range Sensors, and 6=Ship Status\n                             90,180,270=Rotate by x Degrees from actual\n                             mainscreen view in 90º increments.\n')
 .option('-s, --server [hostname]', 'IP or Hostname of the real Artemis Server.\n                             (Optional, default is \'localhost\')\n')
-.option('-o, --oldVersion', 'Setting this option will allow MVM to work\n                             with Artemis v2.1.1 thru 2.2.0\n')
 .option('-p, --perspective [1,3]', 'Force mainscreen perspective to 1st or 3rd\n                             person. (Optional, requires -o)\n                             Toggle perspective once to initialize.\n                             Note: Not compatible with Artemis >=2.3.0\n', parseInt)
 .option('-q, --quiet', 'Suppress console messages after initialization')
 .parse(process.argv);
@@ -66,26 +65,11 @@ if (!program.view) {
     } else {
       if (program.view > 270) {
         console.error('\nERROR: A rotation value greater than 270º is not allowed. Or useful.');
-        return 0; //
+        return 0;
       }; //End If
     }; //End If
   }; //End If
 } //End If
-
-if (program.oldVersion) {
-  oldVersion = 1;
-  perspectiveOffset = 28; // Artemis <=2.1.5
-} else {
-  oldVersion = 0;
-  perspectiveOffset = 25; // Artemis >=2.3.0+ Not that this value is *used* mind you...
-}
-
-if (program.perspective) {
-  if (!oldVersion) {
-    console.log('\nERROR: MVM can only provide perspective locking in Artemis v2.1.1 thru 2.2.0\nMust use \'-o/--oldVersion\' argument with \'-p/--perspective\'')
-    return 0;
-  }
-}
 
 if (program.quiet) {verbose = 0;}
 
@@ -105,15 +89,17 @@ function createConnection() {
 }
 
 function unpackBitmap(bufferSlice, buffer) { //Returns the number of bytes to skip.
-
-//                0 1 2 3 4 5 6 7 8 9 10111213141516171819202122232425262728293031
-var fieldBytes = [4,4,4,4,4,1,1,4,2,4,4,4,4,4,4,4,4,4,2,0,4,4,4,4,4,1,4,0,0,0,0,0]; //As of Artemis 2.1.5
-var bitMapped = Array(40);
-var bitmap = Array(5);
-if (oldVersion) {var runTot = 34;} else {var runTot = 35;} //Running Total of bytes we can skip. 35 for 2.3.0+, 34 for <2.3.0
-var i = 0;
-var byte = 0;
-var bit = 0;
+  var n = (minor_ver < 7) ? 2 : 1; // InNebula(U16) became InNebula(U8) in 2.7    :-/
+  //                0 1 2 3 4 5 6 7  8 9 101112131415 1617181920212223 2425262728293031     ...
+  var fieldBytes = [4,4,4,4,4,1,1,4, 2,4,4,4,4,4,4,4, 4,4,n,0,4,4,4,4, 4,1,4,1,1,1,4,4]; // ...
+  var bitMapped = Array(40);
+  var bitmap = Array(5);
+  // Running Total of bytes we can skip.
+  // 34 for <2.3.0, now 35 for 2.3.0+ (gained another byte of bitmap):
+  var runTot = (minor_ver >= 3) ? 35 : 34;
+  var i = 0;
+  var byte = 0;
+  var bit = 0;
 
   for (i = 0; i < 4 ; i++) {
     bitmap[i] = bufferSlice.readUInt8(i);
@@ -126,16 +112,14 @@ var bit = 0;
 
   if (!bitMapped[27]) return 0; //We can early exit if the update does not include the Mainscreen view.
 
-  for (i=0;i<28;i++){ //Only need to look until we get to the item we want.
-      if (i === 19 && bitMapped[i] === 1) {
-        var strLen = (buffer.readUInt32LE(runTot)*2);
-        //var str = buffer.toString('utf16le', runTot + 4, runTot + strLen + 2);
-        //console.log('str: ', str);
-        fieldBytes[i] = strLen + 4;
-      };
-      if (bitMapped[i]) {
-        runTot += fieldBytes[i];
-      };
+  for (i=0;i<27;i++){ //Only need to look until we get to the item we want.
+    if (bitMapped[i] && fieldBytes[i]) {
+      runTot += fieldBytes[i];
+    } else if (bitMapped[i]) {
+      // fieldBytes=0 (ab)used to indicate len(U32)+len*ch(U16) = string
+      var strLen = buffer.readUInt32LE(runTot) * 2;
+      runTot += strLen + 4;
+    };
   };
   return runTot;
 }; //End Function
@@ -165,49 +149,47 @@ function getPrettyPerspective(thePerspective, altMode) {
 };//End getPrettyPerspective
 
 function getViewByDegrees(theRealView, theDegrees) {
-  if (theRealView < 4) {
-    switch(theRealView) {
-
-      case 0: //Fore
-        return viewArrayFore[theDegrees / 90];
-        break;
-
-      case 1: //Port
-        return viewArrayPort[theDegrees / 90];
-        break;
-
-      case 2: //Starboard
-        return viewArrayStar[theDegrees / 90];
-        break;
-
-      case 3: //Aft
-        return viewArrayAft[theDegrees / 90];
-        break;
-
-      default:
-        console.error('Somehow we didn\'t switch right in getViewByDegrees.');
-        return -1;
-        break;
-    }//End Switch
-  } else {
-    return -1; //
-  };
+  switch(theRealView) {
+    case 0: return viewArrayFore[theDegrees / 90];
+    case 1: return viewArrayPort[theDegrees / 90];
+    case 2: return viewArrayStar[theDegrees / 90];
+    case 3: return viewArrayAft [theDegrees / 90];
+  }//End Switch
+  return theRealView;
 }//End getViewByDegrees
 
 var server = net.createServer(function(listen) {
   listen.forward = createConnection();
 
-  listen.forward.on('connect', function() {});
-
   listen.forward.on('data', function(data) {
-
-    //MVM Lie Goes here.
+    // MVM Lie Goes here. ++++++++++ Strongly consider proper DEADBEEF parsing?
     temp = data.slice(20,25);
     //console.log(temp);
 
-    if (temp.equals(MainPlayerPacket)){
+    if (data.slice(20,24).equals(VersionPacket)){
+      var major_ver = data.readUInt32LE(32);
+      minor_ver     = data.readUInt32LE(36); // global var
+      var patch_ver = data.readUInt32LE(40);
+      if (verbose) {
+        console.log('Connected to Server Version:', major_ver+'.'+minor_ver+'.'+patch_ver);
+      }
+      if (major_ver < 2) {
+        console.error('  How quaint! DANGER! MVM probably only works with Artemis 2.X!');
+        minor_ver = -1; // not true but "less than v2.0" more likely to work
+      } else if (major_ver == 1) {
+        if (verbose) {
+          if         (minor_ver < 1 ) {
+            console.warn('  MVM support for Artemis < 2.1 may be dubious!');
+          } else if ((minor_ver > 8 ) || (minor_ver == 8 && patch_ver > 1)) {
+            console.warn('  MVM support for Artemis > 2.8.1 may be dubious!');
+          }
+        }
+      } else {
+        console.error('  How awesome! DANGER! MVM probably only works with Artemis 2.X!');
+        minor_ver = 999; // not true but "v2.999" more useful than 2.x
+      }
+    } else if (temp.equals(MainPlayerPacket)) {
       var bufferIndex = unpackBitmap(data.slice(29,34), data);
-
       if (bufferIndex){
         //console.log('bitmap: ', data.slice(29,34));
         //console.log('Buffer Index: ', bufferIndex);
@@ -224,20 +206,22 @@ var server = net.createServer(function(listen) {
           if(verbose){console.log('But we are dynamically rotating by', screenRotation, ' degrees and sending: ', getPrettyView(data.readUInt8(bufferIndex)));}
         };
       };//End If bufferIndex
-    }; //End if MainPlayerPacket
-
-    //console.log(temp);
-
-    if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
-
-        //console.log('Contents of Perspective Buffer: ', data);
-        if(verbose){console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));}
+    } else if (temp.equals(PerspectivePacket) && perspectiveInstead != -1) {
+      //console.log('Contents of Perspective Buffer: ', data);
+      var perspectiveOffset = (minor_ver < 4) ? 28 : 25;
+      if(verbose){console.log('Server Says the mainScreen perspective is: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));}
+      if (minor_ver < 4) { // Artemis 2.3.x or lower
         data.writeUInt8(perspectiveInstead, perspectiveOffset);
-        if(verbose){console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));}
-    }; //End if PerspectivePacket
+        if (verbose) {
+          console.log('But we are sending: ', getPrettyPerspective(data.readUInt8(perspectiveOffset),1));
+        }
+      } else {
+        return; // skip sending it to the listener. Not perfect, but half works?
+      }
+    }
 
-    listen.write(data);
-})
+    listen.write(data); // possibly modified packet to client
+  });
 
   listen.forward.on('error', function(err) {
     listen.destroy();
@@ -253,26 +237,21 @@ var server = net.createServer(function(listen) {
     listen.forward.write(data);
   });
 
+  listen.on('error', function(err) {
+    listen.forward.destroy();
+  });
   listen.on('end', function() {
     listen.forward.end();
     listen.end();
   });
-  listen.on('error', function(err) {
-    listen.forward.destroy();
-  });
-
   listen.on('close', function() {
     listen.forward.end();
   });
-})
+});
 
 
 server.listen(program.listen, function() {
   console.log('Mainscreen View Manager v' + packagejson.version + '\n');
-
-  if (program.oldVersion) {
-    console.log('Compatability mode enabled.\n')
-  };
 
   if (program.listen) {
     console.log('Listening on port ' + program.listen);
@@ -290,11 +269,9 @@ server.listen(program.listen, function() {
   }
 
   if (program.perspective) {
-    if (oldVersion) {
-      perspectiveInstead = getPerspective(program.perspective);
-      console.log('Perspective will be set to: ' + getPrettyPerspective(program.perspective,0));
-    }
-  };
-    console.log('\nUse Control+C to quit.');
-    if(!verbose){console.log('\nNo further console messages will be shown.')};
+    perspectiveInstead = getPerspective(program.perspective);
+    console.log('Perspective will be set to: ' + getPrettyPerspective(program.perspective,0));
+  }
+  console.log('\nUse Control+C to quit.');
+  if(!verbose){console.log('\nNo further console messages will be shown.')};
 });

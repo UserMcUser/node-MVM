@@ -1,0 +1,8 @@
+# Do NOT commit common editor backup files and stuff:
+*~
+.#*
+*.bak
+
+# Don't commit these NodeJS compile-time artifacts either:
+node_modules/
+package-lock.json
